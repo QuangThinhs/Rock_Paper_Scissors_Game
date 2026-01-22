@@ -52,6 +52,9 @@ class GameServer:
                     self.handle_find_match(session_token)
                 elif action == 'make_choice':
                     self.handle_make_choice(session_token, message)
+                # --- MỚI: Thêm xử lý refresh_stats ---
+                elif action == 'refresh_stats':
+                    self.handle_refresh_stats(session_token)
 
         except Exception as e:
             print(f"[ERROR] {addr}: {e}")
@@ -88,6 +91,26 @@ class GameServer:
         else:
             response = {'action': 'login_response', 'success': False, 'message': result}
         client_socket.send(json.dumps(response).encode('utf-8'))
+
+    # --- MỚI: Hàm xử lý cập nhật thống kê ---
+    def handle_refresh_stats(self, session_token):
+        """Gửi thống kê mới nhất cho client"""
+        if session_token in self.clients and self.clients[session_token]['user']:
+            user_id = self.clients[session_token]['user']['id']
+            # Lấy dữ liệu mới nhất từ DB
+            stats = self.db.get_user_stats(user_id)
+            if stats:
+                # Cập nhật bộ nhớ đệm trên server
+                self.clients[session_token]['user']['wins'] = stats['wins']
+                self.clients[session_token]['user']['losses'] = stats['losses']
+                self.clients[session_token]['user']['draws'] = stats['draws']
+                
+                # Gửi về client
+                response = {
+                    'action': 'stats_refreshed',
+                    'stats': stats
+                }
+                self.clients[session_token]['socket'].send(json.dumps(response).encode('utf-8'))
 
     def handle_find_match(self, session_token):
         """Xử lý tìm trận đấu"""
@@ -158,21 +181,9 @@ class GameServer:
             winner_id
         )
         
-        # ✨ CÂP NHẬT THỐNG KÊ NGAY LẬP TỨC ✨
         # Lấy thống kê mới từ database
         p1_stats = self.db.get_user_stats(p1_user['id'])
         p2_stats = self.db.get_user_stats(p2_user['id'])
-        
-        # Cập nhật thống kê trong bộ nhớ server
-        if p1_stats:
-            self.clients[game['player1']]['user']['wins'] = p1_stats['wins']
-            self.clients[game['player1']]['user']['losses'] = p1_stats['losses']
-            self.clients[game['player1']]['user']['draws'] = p1_stats['draws']
-        
-        if p2_stats:
-            self.clients[game['player2']]['user']['wins'] = p2_stats['wins']
-            self.clients[game['player2']]['user']['losses'] = p2_stats['losses']
-            self.clients[game['player2']]['user']['draws'] = p2_stats['draws']
         
         # Gửi kết quả cho player 1 (kèm stats mới)
         result_data = {
@@ -180,15 +191,9 @@ class GameServer:
             'your_choice': game['choices']['player1'],
             'opponent_choice': game['choices']['player2'],
             'result': result,
-            'updated_stats': {
-                'wins': p1_stats['wins'] if p1_stats else p1_user['wins'],
-                'losses': p1_stats['losses'] if p1_stats else p1_user['losses'],
-                'draws': p1_stats['draws'] if p1_stats else p1_user['draws']
-            }
+            'updated_stats': p1_stats if p1_stats else None 
         }
-        self.clients[game['player1']]['socket'].send(
-            json.dumps(result_data).encode('utf-8')
-        )
+        self.clients[game['player1']]['socket'].send(json.dumps(result_data).encode('utf-8'))
         
         # Gửi kết quả cho player 2 (kèm stats mới)
         result_data['your_choice'] = game['choices']['player2']
@@ -197,15 +202,9 @@ class GameServer:
             result_data['result'] = 'player2'
         elif result == 'player2':
             result_data['result'] = 'player1'
-        result_data['updated_stats'] = {
-            'wins': p2_stats['wins'] if p2_stats else p2_user['wins'],
-            'losses': p2_stats['losses'] if p2_stats else p2_user['losses'],
-            'draws': p2_stats['draws'] if p2_stats else p2_user['draws']
-        }
+        result_data['updated_stats'] = p2_stats if p2_stats else None
         
-        self.clients[game['player2']]['socket'].send(
-            json.dumps(result_data).encode('utf-8')
-        )
+        self.clients[game['player2']]['socket'].send(json.dumps(result_data).encode('utf-8'))
         
         self.clients[game['player1']]['in_game'] = False
         self.clients[game['player2']]['in_game'] = False
