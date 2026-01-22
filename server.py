@@ -17,8 +17,8 @@ class GameServer:
         # Khởi tạo database
         self.db_config = {
             'host': 'localhost',
-            'user': 'root',
-            'password': 'locdeptrai12',  # Thay đổi password
+            'user': 'root',     
+            'password': '',       
             'database': 'rps_game'
         }
         self.db = DatabaseManager(self.db_config)

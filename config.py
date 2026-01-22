@@ -1,8 +1,8 @@
 # Cấu hình Database
 DB_CONFIG = {
     'host': 'localhost',
-    'user': 'root',
-    'password': 'locdeptrai12',  # Thay đổi password của bạn
+    'user': 'root',      
+    'password': '',       
     'database': 'rps_game'
 }
 
